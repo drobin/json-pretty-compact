@@ -20,7 +20,23 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-mod error;
-mod token;
+use thiserror::Error;
 
-pub use crate::error::Error;
+/// Error type of the library
+#[derive(Debug, Error)]
+pub enum Error {
+    /// An unexpected event was detected.
+    ///
+    /// Tried to get an event of type `expected` but got `found`.
+    #[error("unexpected event (expected {expected}, found {found})")]
+    UnexpectedEvent { expected: String, found: String },
+}
+
+impl Error {
+    pub fn unexpected_event(expected: &str, found: &str) -> Error {
+        Error::UnexpectedEvent {
+            expected: expected.to_string(),
+            found: found.to_string(),
+        }
+    }
+}
