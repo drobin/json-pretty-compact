@@ -1,0 +1,36 @@
+[
+  {
+    "name": {
+      "first": "Kobe",
+      "middle": "Nico",
+      "last": "Grimes"
+    },
+    "phoneNumber": "1-547-479-5471 x062",
+    "username": "Kobe-Grimes",
+    "emails": [
+      "Melyssa.Cremin4@gmail.com",
+      "Jayne.Green37@gmail.com"
+    ],
+    "coordinates": {
+      "latitude": "-66.3821",
+      "longitude": "127.117"
+    }
+  },
+  {
+    "name": {
+      "first": "Adrian",
+      "middle": "Finley",
+      "last": "Koch"
+    },
+    "phoneNumber": "1-420-853-5251 x68083",
+    "username": "Adrian-Koch",
+    "emails": [
+      "Andy99@gmail.com",
+      "Elenor.Aufderhar96@gmail.com"
+    ],
+    "coordinates": {
+      "latitude": "51.4003",
+      "longitude": "3.351"
+    }
+  }
+]
