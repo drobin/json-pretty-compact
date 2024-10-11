@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+use std::io;
 use thiserror::Error;
 
 /// Error type of the library
@@ -30,13 +31,31 @@ pub enum Error {
     /// Tried to get an event of type `expected` but got `found`.
     #[error("unexpected event (expected {expected}, found {found})")]
     UnexpectedEvent { expected: String, found: String },
+
+    /// The internal token-queue is empty.
+    #[error("the event queue is empty")]
+    EmptyTokenQueue,
+
+    /// Could not find the array-start token.
+    #[error("could not find start of array")]
+    NoArrayStart,
+
+    /// Could not find the object-start token.
+    #[error("could not find start of object")]
+    NoObjectStart,
 }
 
 impl Error {
-    pub fn unexpected_event(expected: &str, found: &str) -> Error {
+    pub(crate) fn unexpected_event(expected: &str, found: &str) -> Error {
         Error::UnexpectedEvent {
             expected: expected.to_string(),
             found: found.to_string(),
         }
+    }
+}
+
+impl From<Error> for io::Error {
+    fn from(cause: Error) -> io::Error {
+        io::Error::new(io::ErrorKind::Other, cause)
     }
 }

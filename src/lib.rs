@@ -21,6 +21,8 @@
 // SOFTWARE.
 
 mod error;
+mod fmt;
 mod token;
 
 pub use crate::error::Error;
+pub use crate::fmt::PrettyCompactFormatter;
