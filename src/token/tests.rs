@@ -21,35 +21,7 @@
 // SOFTWARE.
 
 use crate::error::Error;
-use crate::token::{Data, Token};
-
-#[test]
-fn data_push_slice() {
-    let mut data: Data = vec![].into();
-
-    data.push_slice(b"");
-    assert!(data.0.is_empty());
-
-    data.push_slice(b"abc");
-    assert_eq!(data.0, b"abc");
-
-    data.push_slice(b"123");
-    assert_eq!(data.0, b"abc123");
-}
-
-#[test]
-fn data_push_str() {
-    let mut data: Data = vec![].into();
-
-    data.push_str("");
-    assert!(data.0.is_empty());
-
-    data.push_str("abc");
-    assert_eq!(data.0, b"abc");
-
-    data.push_str("123");
-    assert_eq!(data.0, b"abc123");
-}
+use crate::token::Token;
 
 #[test]
 fn as_begin_object_begin_object() {
@@ -81,7 +53,7 @@ fn as_begin_object_end_array() {
 
 #[test]
 fn as_begin_object_data() {
-    let t = Token::Data(vec![].into());
+    let t = Token::Data(vec![]);
 
     assert!(t.as_begin_object().is_none());
 }
@@ -122,7 +94,7 @@ fn as_begin_object_err_end_array() {
 
 #[test]
 fn as_begin_object_err_data() {
-    let t = Token::Data(vec![].into());
+    let t = Token::Data(vec![]);
     let err = t.as_begin_object_err().unwrap_err();
 
     assert!(matches!(err, Error::UnexpectedEvent { expected, found }
@@ -159,7 +131,7 @@ fn is_end_object_end_array() {
 
 #[test]
 fn is_end_object_data() {
-    let t = Token::Data(vec![].into());
+    let t = Token::Data(vec![]);
 
     assert!(!t.is_end_object());
 }
@@ -194,7 +166,7 @@ fn as_begin_array_end_array() {
 
 #[test]
 fn as_begin_array_data() {
-    let t = Token::Data(vec![].into());
+    let t = Token::Data(vec![]);
 
     assert!(t.as_begin_array().is_none());
 }
@@ -235,7 +207,7 @@ fn as_begin_array_err_end_array() {
 
 #[test]
 fn as_begin_array_err_data() {
-    let t = Token::Data(vec![].into());
+    let t = Token::Data(vec![]);
     let err = t.as_begin_array_err().unwrap_err();
 
     assert!(matches!(err, Error::UnexpectedEvent { expected, found }
@@ -272,7 +244,7 @@ fn is_end_array_end_array() {
 
 #[test]
 fn is_end_array_data() {
-    let t = Token::Data(vec![].into());
+    let t = Token::Data(vec![]);
 
     assert!(!t.is_end_array());
 }
@@ -307,9 +279,9 @@ fn as_data_end_array() {
 
 #[test]
 fn as_data_data() {
-    let t = Token::Data(vec![].into());
+    let t = Token::Data(vec![]);
 
-    assert_eq!(t.as_data().unwrap(), &vec![].into());
+    assert_eq!(t.as_data().unwrap(), [] as [u8; 0]);
 }
 
 #[test]
@@ -350,44 +322,9 @@ fn as_data_err_end_array() {
 
 #[test]
 fn as_data_err_data() {
-    let t = Token::Data(vec![].into());
+    let t = Token::Data(vec![]);
 
-    assert_eq!(t.as_data_err().unwrap(), &vec![].into());
-}
-
-#[test]
-fn as_data_ref_begin_object() {
-    let t = Token::BeginObject(4711);
-
-    assert!(t.as_data_ref().is_none());
-}
-
-#[test]
-fn as_data_ref_end_object() {
-    let t = Token::EndObject;
-
-    assert!(t.as_data_ref().is_none());
-}
-
-#[test]
-fn as_data_ref_begin_array() {
-    let t = Token::BeginArray(4711);
-
-    assert!(t.as_data_ref().is_none());
-}
-
-#[test]
-fn as_data_ref_end_array() {
-    let t = Token::EndArray;
-
-    assert!(t.as_data_ref().is_none());
-}
-
-#[test]
-fn as_data_mut_ref_data() {
-    let t = Token::Data(vec![].into());
-
-    assert_eq!(t.as_data_ref().unwrap(), [] as [u8; 0]);
+    assert_eq!(t.as_data_err().unwrap(), [] as [u8; 0]);
 }
 
 #[test]
@@ -420,9 +357,9 @@ fn as_data_mut_end_array() {
 
 #[test]
 fn as_data_mut_data() {
-    let mut t = Token::Data(vec![].into());
+    let mut t = Token::Data(vec![]);
 
-    assert_eq!(t.as_data_mut().unwrap(), &vec![].into());
+    assert_eq!(t.as_data_mut().unwrap(), &mut Vec::<u8>::new());
 }
 
 #[test]
@@ -463,7 +400,7 @@ fn as_data_mut_err_end_array() {
 
 #[test]
 fn as_data_mut_err_data() {
-    let mut t = Token::Data(vec![].into());
+    let mut t = Token::Data(vec![]);
 
-    assert_eq!(t.as_data_mut_err().unwrap(), &vec![].into());
+    assert_eq!(t.as_data_mut_err().unwrap(), &mut Vec::<u8>::new());
 }

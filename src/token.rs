@@ -25,38 +25,13 @@ mod tests;
 
 use crate::error::Error;
 
-#[derive(Debug, PartialEq)]
-pub struct Data(Vec<u8>);
-
-impl Data {
-    pub fn push_slice(&mut self, buf: &[u8]) {
-        self.0.extend_from_slice(buf);
-    }
-
-    pub fn push_str(&mut self, fragment: &str) {
-        self.push_slice(fragment.as_bytes());
-    }
-}
-
-impl AsRef<[u8]> for Data {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl From<Vec<u8>> for Data {
-    fn from(vec: Vec<u8>) -> Data {
-        Data(vec)
-    }
-}
-
 #[derive(Debug)]
 pub enum Token {
     BeginObject(u32),
     EndObject,
     BeginArray(u32),
     EndArray,
-    Data(Data),
+    Data(Vec<u8>),
 }
 
 impl Token {
@@ -92,33 +67,26 @@ impl Token {
         matches!(self, Self::EndArray)
     }
 
-    pub fn as_data(&self) -> Option<&Data> {
-        match self {
-            Self::Data(data) => Some(data),
-            _ => None,
-        }
-    }
-
-    pub fn as_data_err(&self) -> Result<&Data, Error> {
-        self.as_data()
-            .ok_or_else(|| Error::unexpected_event("Data", self.debug_info()))
-    }
-
-    pub fn as_data_ref(&self) -> Option<&[u8]> {
+    pub fn as_data(&self) -> Option<&[u8]> {
         match self {
             Self::Data(data) => Some(data.as_ref()),
             _ => None,
         }
     }
 
-    pub fn as_data_mut(&mut self) -> Option<&mut Data> {
+    pub fn as_data_err(&self) -> Result<&[u8], Error> {
+        self.as_data()
+            .ok_or_else(|| Error::unexpected_event("Data", self.debug_info()))
+    }
+
+    pub fn as_data_mut(&mut self) -> Option<&mut Vec<u8>> {
         match self {
             Self::Data(data) => Some(data),
             _ => None,
         }
     }
 
-    pub fn as_data_mut_err(&mut self) -> Result<&mut Data, Error> {
+    pub fn as_data_mut_err(&mut self) -> Result<&mut Vec<u8>, Error> {
         let di = self.debug_info();
 
         self.as_data_mut()

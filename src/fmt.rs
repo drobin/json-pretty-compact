@@ -151,7 +151,7 @@ impl PrettyCompactFormatter {
         }
 
         if self.token.len() == 1 {
-            if let Some(buf) = self.token[0].as_data_ref() {
+            if let Some(buf) = self.token[0].as_data() {
                 writer.write_all(buf)?;
                 self.token.pop();
             }
@@ -180,7 +180,7 @@ impl PrettyCompactFormatter {
         }
 
         for t in &self.token[idx + 1..self.token.len() - 1] {
-            let value = t.as_data_err().map(AsRef::as_ref)?;
+            let value = t.as_data_err()?;
 
             if !first {
                 if compact {
@@ -210,7 +210,7 @@ impl PrettyCompactFormatter {
         }
 
         self.token.drain(idx..);
-        self.token.push(Token::Data(cursor.into_inner().into()));
+        self.token.push(Token::Data(cursor.into_inner()));
 
         Ok(())
     }
@@ -239,8 +239,8 @@ impl PrettyCompactFormatter {
             .map(|chunk| (&chunk[0], &chunk[1]));
 
         for (t1, t2) in iter {
-            let key = t1.as_data_err().map(AsRef::as_ref)?;
-            let value = t2.as_data_err().map(AsRef::as_ref)?;
+            let key = t1.as_data_err()?;
+            let value = t2.as_data_err()?;
 
             if !first {
                 if compact {
@@ -272,7 +272,7 @@ impl PrettyCompactFormatter {
         }
 
         self.token.drain(idx..);
-        self.token.push(Token::Data(cursor.into_inner().into()));
+        self.token.push(Token::Data(cursor.into_inner()));
 
         Ok(())
     }
@@ -287,7 +287,7 @@ impl PrettyCompactFormatter {
             } else {
                 let n = token
                     .iter()
-                    .filter_map(|t| t.as_data_ref())
+                    .filter_map(|t| t.as_data())
                     .fold(0, |acc, buf| acc + buf.len());
 
                 // add all the commas and spaces
@@ -314,7 +314,7 @@ impl PrettyCompactFormatter {
             } else {
                 let n = token
                     .iter()
-                    .filter_map(|t| t.as_data_ref())
+                    .filter_map(|t| t.as_data())
                     .fold(0, |acc, buf| acc + buf.len());
 
                 // add all the commas and spaces
@@ -367,7 +367,7 @@ impl Formatter for PrettyCompactFormatter {
     write_func!(write_number_str(&str));
 
     fn begin_string<W: ?Sized + io::Write>(&mut self, _writer: &mut W) -> io::Result<()> {
-        self.token.push(Token::Data(b"\"".to_vec().into()));
+        self.token.push(Token::Data(b"\"".to_vec()));
 
         Ok(())
     }
@@ -376,7 +376,7 @@ impl Formatter for PrettyCompactFormatter {
         let t = self.token.last_mut().ok_or(Error::EmptyTokenQueue)?;
         let data = t.as_data_mut_err()?;
 
-        data.push_str("\"");
+        data.extend_from_slice(b"\"");
 
         self.format_json(writer)
     }
@@ -389,7 +389,7 @@ impl Formatter for PrettyCompactFormatter {
         let t = self.token.last_mut().ok_or(Error::EmptyTokenQueue)?;
         let data = t.as_data_mut_err()?;
 
-        data.push_str(fragment);
+        data.extend_from_slice(fragment.as_bytes());
 
         Ok(())
     }
@@ -404,7 +404,7 @@ impl Formatter for PrettyCompactFormatter {
         let t = self.token.last_mut().ok_or(Error::EmptyTokenQueue)?;
         let data = t.as_data_mut_err()?;
 
-        data.push_slice(&vec);
+        data.extend_from_slice(&vec);
 
         Ok(())
     }
