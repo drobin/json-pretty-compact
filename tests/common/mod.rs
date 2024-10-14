@@ -25,7 +25,6 @@ use serde::Serialize;
 use serde_json::{Serializer, Value};
 use std::cmp;
 use std::fs::{self, File};
-use std::io::Cursor;
 use std::path::PathBuf;
 
 pub fn fixture_path(name: &str, extension: &str) -> PathBuf {
@@ -50,12 +49,12 @@ pub fn parse_json_string(json: &str) -> Value {
 }
 
 pub fn serialize_to_string(value: &Value, formatter: PrettyCompactFormatter) -> String {
-    let mut cursor = Cursor::new(vec![]);
-    let mut ser = Serializer::with_formatter(&mut cursor, formatter);
+    let mut vec = vec![];
+    let mut ser = Serializer::with_formatter(&mut vec, formatter);
 
     value.serialize(&mut ser).unwrap();
 
-    String::from_utf8(cursor.into_inner()).unwrap()
+    String::from_utf8(vec).unwrap()
 }
 
 pub fn fixture_to_string(name: &str, extension: &str) -> String {

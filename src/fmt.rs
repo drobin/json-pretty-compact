@@ -21,22 +21,22 @@
 // SOFTWARE.
 
 use serde_json::ser::{CharEscape, CompactFormatter, Formatter};
-use std::io::{self, Cursor};
+use std::io;
 
 use crate::error::Error;
 use crate::options::Options;
 use crate::token::Token;
 
-fn write_to_vec<F: FnOnce(&mut Cursor<Vec<u8>>) -> io::Result<()>>(f: F) -> io::Result<Vec<u8>> {
-    let mut cursor = Cursor::new(vec![]);
+fn write_to_vec<F: FnOnce(&mut Vec<u8>) -> io::Result<()>>(f: F) -> io::Result<Vec<u8>> {
+    let mut vec = vec![];
 
-    f(&mut cursor).map(|()| cursor.into_inner())
+    f(&mut vec).map(|()| vec)
 }
 
 macro_rules! write_func {
     ($name:ident ( )) => {
         fn $name<W: ?Sized + io::Write>(&mut self, writer: &mut W) -> io::Result<()> {
-            let vec = write_to_vec(|cursor| CompactFormatter.$name(cursor))?;
+            let vec = write_to_vec(|v| CompactFormatter.$name(v))?;
 
             self.token.push(Token::Data(vec.into()));
             self.format_json(writer)
@@ -49,7 +49,7 @@ macro_rules! write_func {
             writer: &mut W,
             value: $value,
         ) -> io::Result<()> {
-            let vec = write_to_vec(|cursor| CompactFormatter.$name(cursor, value))?;
+            let vec = write_to_vec(|v| CompactFormatter.$name(v, value))?;
 
             self.token.push(Token::Data(vec.into()));
             self.format_json(writer)
@@ -243,7 +243,7 @@ impl Formatter for PrettyCompactFormatter {
         _writer: &mut W,
         char_escape: CharEscape,
     ) -> io::Result<()> {
-        let vec = write_to_vec(|cursor| CompactFormatter.write_char_escape(cursor, char_escape))?;
+        let vec = write_to_vec(|v| CompactFormatter.write_char_escape(v, char_escape))?;
 
         let t = self.token.last_mut().ok_or(Error::EmptyTokenQueue)?;
         let data = t.as_data_mut_err()?;
