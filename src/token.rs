@@ -23,7 +23,17 @@
 #[cfg(test)]
 mod tests;
 
+use std::io;
+
 use crate::error::Error;
+
+macro_rules! write_indent {
+    ($writer:expr, $len:ident) => {
+        if $len > 0 {
+            write!($writer, "{:len$}", " ", len = $len)?;
+        }
+    };
+}
 
 #[derive(Debug)]
 pub enum Token {
@@ -32,6 +42,8 @@ pub enum Token {
     BeginArray(u32),
     EndArray,
     Data(Vec<u8>),
+    Array(u32, Vec<Token>),
+    Object(u32, Vec<Token>),
 }
 
 impl Token {
@@ -40,11 +52,6 @@ impl Token {
             Self::BeginObject(level) => Some(*level),
             _ => None,
         }
-    }
-
-    pub fn as_begin_object_err(&self) -> Result<u32, Error> {
-        self.as_begin_object()
-            .ok_or_else(|| Error::unexpected_event("BeginObject", self.debug_info()))
     }
 
     pub fn is_end_object(&self) -> bool {
@@ -56,11 +63,6 @@ impl Token {
             Self::BeginArray(level) => Some(*level),
             _ => None,
         }
-    }
-
-    pub fn as_begin_array_err(&self) -> Result<u32, Error> {
-        self.as_begin_array()
-            .ok_or_else(|| Error::unexpected_event("BeginArray", self.debug_info()))
     }
 
     pub fn is_end_array(&self) -> bool {
@@ -93,6 +95,156 @@ impl Token {
             .ok_or_else(|| Error::unexpected_event("Data", di))
     }
 
+    pub fn length(&self) -> usize {
+        match self {
+            Token::BeginObject(_) | Token::EndObject | Token::BeginArray(_) | Token::EndArray => 0,
+            Token::Data(vec) => vec.len(),
+            Token::Array(_, token) => {
+                if token.is_empty() {
+                    3 // [ ]
+                } else {
+                    let n = token.iter().fold(0, |acc, t| acc + t.length());
+
+                    // add all the commas and spaces
+                    4 + n + (token.len() - 1) * 2
+                }
+            }
+            Token::Object(_, token) => {
+                if token.is_empty() {
+                    3 // { }
+                } else {
+                    let n = token.iter().fold(0, |acc, t| acc + t.length());
+
+                    // add all the commas and spaces
+                    4 + n + (token.len() - 1) * 3
+                }
+            }
+        }
+    }
+
+    pub fn format<W: ?Sized + io::Write>(
+        &self,
+        writer: &mut W,
+        indent: u32,
+        max_len: Option<u32>,
+    ) -> io::Result<()> {
+        match self {
+            Token::BeginObject(_) | Token::EndObject | Token::BeginArray(_) | Token::EndArray => {}
+            Token::Data(vec) => writer.write_all(vec)?,
+            Token::Array(level, token) => {
+                let compact = self.can_compact(indent, max_len);
+                let mut first = true;
+
+                let spaces = (level * indent) as usize;
+                let spaces_next = ((level + 1) * indent) as usize;
+
+                if compact {
+                    writer.write_all(b"[ ")?;
+                } else {
+                    writer.write_all(b"[\n")?;
+                }
+
+                for t in token {
+                    if !first {
+                        if compact {
+                            writer.write_all(b", ")?;
+                        } else {
+                            writer.write_all(b",\n")?;
+                        }
+                    }
+
+                    if !compact {
+                        write_indent!(writer, spaces_next);
+                    }
+
+                    t.format(writer, indent, max_len)?;
+
+                    first = false;
+                }
+
+                if compact && first {
+                    writer.write_all(b"]")?;
+                } else if compact && !first {
+                    writer.write_all(b" ]")?;
+                } else {
+                    writer.write_all(b"\n")?;
+                    write_indent!(writer, spaces);
+                    writer.write_all(b"]")?;
+                }
+            }
+            Token::Object(level, token) => {
+                let compact = self.can_compact(indent, max_len);
+                let mut first = true;
+
+                let spaces = (level * indent) as usize;
+                let spaces_next = ((level + 1) * indent) as usize;
+
+                if compact {
+                    writer.write_all(b"{ ")?;
+                } else {
+                    writer.write_all(b"{\n")?;
+                }
+
+                let iter = token.chunks_exact(2).map(|chunk| (&chunk[0], &chunk[1]));
+
+                for (t1, t2) in iter {
+                    let key = t1.as_data_err()?;
+
+                    if !first {
+                        if compact {
+                            writer.write_all(b", ")?;
+                        } else {
+                            writer.write_all(b",\n")?;
+                        }
+                    }
+
+                    if !compact {
+                        write_indent!(writer, spaces_next);
+                    }
+
+                    writer.write_all(key)?;
+                    writer.write_all(b": ")?;
+                    t2.format(writer, indent, max_len)?;
+
+                    first = false;
+                }
+
+                if compact && first {
+                    writer.write_all(b"}")?;
+                } else if compact && !first {
+                    writer.write_all(b" }")?;
+                } else {
+                    writer.write_all(b"\n")?;
+                    write_indent!(writer, spaces);
+                    writer.write_all(b"}")?;
+                }
+            }
+        };
+
+        Ok(())
+    }
+
+    fn can_compact(&self, indent: u32, max_len: Option<u32>) -> bool {
+        match self {
+            Token::BeginObject(_)
+            | Token::EndObject
+            | Token::BeginArray(_)
+            | Token::EndArray
+            | Token::Data(_) => true,
+            Token::Array(level, _) | Token::Object(level, _) => {
+                if let Some(ml) = max_len {
+                    let mut len = self.length();
+
+                    len += (level * indent) as usize;
+
+                    len < ml as usize
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
     fn debug_info(&self) -> &'static str {
         match self {
             Self::BeginObject(_) => "BeginObject",
@@ -100,6 +252,8 @@ impl Token {
             Self::BeginArray(_) => "BeginArray",
             Self::EndArray => "EndArray",
             Self::Data(_) => "Data",
+            Self::Array(_, _) => "Array",
+            Self::Object(_, _) => "Object",
         }
     }
 }

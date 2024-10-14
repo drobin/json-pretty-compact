@@ -37,7 +37,11 @@
     "WEEK": [
       {
         "NUMBER": 3,
-        "EXPENSE": [ { "WHAT": "Car", "AMOUNT": 19.0 }, { "WHAT": "Food", "AMOUNT": 18.0 }, { "WHAT": "Beer", "AMOUNT": 18.0 } ]
+        "EXPENSE": [
+          { "WHAT": "Car", "AMOUNT": 19.0 },
+          { "WHAT": "Food", "AMOUNT": 18.0 },
+          { "WHAT": "Beer", "AMOUNT": 18.0 }
+        ]
       },
       { "NUMBER": 4, "EXPENSE": [ { "WHAT": "Car", "AMOUNT": 17.0 } ] },
       {

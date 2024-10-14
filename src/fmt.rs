@@ -21,7 +21,7 @@
 // SOFTWARE.
 
 use serde_json::ser::{CharEscape, CompactFormatter, Formatter};
-use std::io::{self, Cursor, Write};
+use std::io::{self, Cursor};
 
 use crate::error::Error;
 use crate::token::Token;
@@ -33,14 +33,6 @@ fn write_to_vec<F: FnOnce(&mut Cursor<Vec<u8>>) -> io::Result<()>>(f: F) -> io::
     let mut cursor = Cursor::new(vec![]);
 
     f(&mut cursor).map(|()| cursor.into_inner())
-}
-
-macro_rules! write_indent {
-    ($writer:expr, $len:ident) => {
-        if $len > 0 {
-            write!($writer, "{:len$}", " ", len = $len)?;
-        }
-    };
 }
 
 macro_rules! write_func {
@@ -145,190 +137,46 @@ impl PrettyCompactFormatter {
 
     fn format_json<W: ?Sized + io::Write>(&mut self, writer: &mut W) -> io::Result<()> {
         if self.token.last().map_or(false, |t| t.is_end_array()) {
-            self.format_array()?;
+            self.reduce_array()?;
         } else if self.token.last().map_or(false, |t| t.is_end_object()) {
-            self.format_object()?;
+            self.reduce_object()?;
         }
 
         if self.token.len() == 1 {
-            if let Some(buf) = self.token[0].as_data() {
-                writer.write_all(buf)?;
-                self.token.pop();
-            }
+            self.token[0].format(writer, self.indent, self.max_len)?;
         }
 
         Ok(())
     }
 
-    fn format_array(&mut self) -> io::Result<()> {
+    fn reduce_array(&mut self) -> Result<(), Error> {
         let (idx, level) = self
             .find_last_token(|t| t.as_begin_array())
             .ok_or(Error::NoArrayStart)?;
 
-        let compact = self.can_compact_array(idx)?;
+        let mut array = self.token.drain(idx..).collect::<Vec<Token>>();
 
-        let mut cursor = Cursor::new(vec![]);
-        let mut first = true;
+        array.remove(0);
+        array.pop();
 
-        let spaces = (level * self.indent) as usize;
-        let spaces_next = ((level + 1) * self.indent) as usize;
-
-        if compact {
-            cursor.write_all(b"[ ")?;
-        } else {
-            cursor.write_all(b"[\n")?;
-        }
-
-        for t in &self.token[idx + 1..self.token.len() - 1] {
-            let value = t.as_data_err()?;
-
-            if !first {
-                if compact {
-                    cursor.write_all(b", ")?;
-                } else {
-                    cursor.write_all(b",\n")?;
-                }
-            }
-
-            if !compact {
-                write_indent!(cursor, spaces_next);
-            }
-
-            cursor.write_all(value)?;
-
-            first = false;
-        }
-
-        if compact && first {
-            cursor.write_all(b"]")?;
-        } else if compact && !first {
-            cursor.write_all(b" ]")?;
-        } else {
-            cursor.write_all(b"\n")?;
-            write_indent!(cursor, spaces);
-            cursor.write_all(b"]")?;
-        }
-
-        self.token.drain(idx..);
-        self.token.push(Token::Data(cursor.into_inner()));
+        self.token.push(Token::Array(level, array));
 
         Ok(())
     }
 
-    fn format_object(&mut self) -> io::Result<()> {
+    fn reduce_object(&mut self) -> Result<(), Error> {
         let (idx, level) = self
             .find_last_token(|t| t.as_begin_object())
             .ok_or(Error::NoObjectStart)?;
 
-        let compact = self.can_compact_object(idx)?;
+        let mut object = self.token.drain(idx..).collect::<Vec<Token>>();
 
-        let mut cursor = Cursor::new(vec![]);
-        let mut first = true;
+        object.remove(0);
+        object.pop();
 
-        let spaces = (level * self.indent) as usize;
-        let spaces_next = ((level + 1) * self.indent) as usize;
-
-        if compact {
-            cursor.write_all(b"{ ")?;
-        } else {
-            cursor.write_all(b"{\n")?;
-        }
-
-        let iter = self.token[idx + 1..]
-            .chunks_exact(2)
-            .map(|chunk| (&chunk[0], &chunk[1]));
-
-        for (t1, t2) in iter {
-            let key = t1.as_data_err()?;
-            let value = t2.as_data_err()?;
-
-            if !first {
-                if compact {
-                    cursor.write_all(b", ")?;
-                } else {
-                    cursor.write_all(b",\n")?;
-                }
-            }
-
-            if !compact {
-                write_indent!(cursor, spaces_next);
-            }
-
-            cursor.write_all(key)?;
-            cursor.write_all(b": ")?;
-            cursor.write_all(value)?;
-
-            first = false;
-        }
-
-        if compact && first {
-            cursor.write_all(b"}")?;
-        } else if compact && !first {
-            cursor.write_all(b" }")?;
-        } else {
-            cursor.write_all(b"\n")?;
-            write_indent!(cursor, spaces);
-            cursor.write_all(b"}")?;
-        }
-
-        self.token.drain(idx..);
-        self.token.push(Token::Data(cursor.into_inner()));
+        self.token.push(Token::Object(level, object));
 
         Ok(())
-    }
-
-    fn can_compact_array(&self, idx: usize) -> Result<bool, Error> {
-        let level = self.token[idx].as_begin_array_err()?;
-        let token = &self.token[idx + 1..self.token.len() - 1];
-
-        if let Some(max_len) = self.max_len {
-            let mut len = if token.is_empty() {
-                3 // "[ ]"
-            } else {
-                let n = token
-                    .iter()
-                    .filter_map(|t| t.as_data())
-                    .fold(0, |acc, buf| acc + buf.len());
-
-                // add all the commas and spaces
-                4 + n + (token.len() - 1) * 2
-            };
-
-            len += (level * self.indent) as usize;
-
-            if len <= max_len as usize {
-                return Ok(true);
-            }
-        }
-
-        Ok(false)
-    }
-
-    fn can_compact_object(&self, idx: usize) -> Result<bool, Error> {
-        let level = self.token[idx].as_begin_object_err()?;
-        let token = &self.token[idx + 1..self.token.len() - 1];
-
-        if let Some(max_len) = self.max_len {
-            let mut len = if token.is_empty() {
-                3 // { }
-            } else {
-                let n = token
-                    .iter()
-                    .filter_map(|t| t.as_data())
-                    .fold(0, |acc, buf| acc + buf.len());
-
-                // add all the commas and spaces
-                4 + n + (token.len() - 1) * 3
-            };
-
-            len += (level * self.indent) as usize;
-
-            if len <= max_len as usize {
-                return Ok(true);
-            }
-        }
-
-        Ok(false)
     }
 
     fn find_last_token<P: FnMut(&Token) -> Option<u32>>(

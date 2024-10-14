@@ -59,49 +59,6 @@ fn as_begin_object_data() {
 }
 
 #[test]
-fn as_begin_object_err_begin_object() {
-    let t = Token::BeginObject(4711);
-
-    assert_eq!(t.as_begin_object_err().unwrap(), 4711);
-}
-
-#[test]
-fn as_begin_object_err_end_object() {
-    let t = Token::EndObject;
-    let err = t.as_begin_object_err().unwrap_err();
-
-    assert!(matches!(err, Error::UnexpectedEvent { expected, found }
-        if expected == "BeginObject" && found == "EndObject"));
-}
-
-#[test]
-fn as_begin_object_err_begin_array() {
-    let t = Token::BeginArray(4711);
-    let err = t.as_begin_object_err().unwrap_err();
-
-    assert!(matches!(err, Error::UnexpectedEvent { expected, found }
-        if expected == "BeginObject" && found == "BeginArray"));
-}
-
-#[test]
-fn as_begin_object_err_end_array() {
-    let t = Token::EndArray;
-    let err = t.as_begin_object_err().unwrap_err();
-
-    assert!(matches!(err, Error::UnexpectedEvent { expected, found }
-        if expected == "BeginObject" && found == "EndArray"));
-}
-
-#[test]
-fn as_begin_object_err_data() {
-    let t = Token::Data(vec![]);
-    let err = t.as_begin_object_err().unwrap_err();
-
-    assert!(matches!(err, Error::UnexpectedEvent { expected, found }
-        if expected == "BeginObject" && found == "Data"));
-}
-
-#[test]
 fn is_end_object_begin_object() {
     let t = Token::BeginObject(4711);
 
@@ -169,49 +126,6 @@ fn as_begin_array_data() {
     let t = Token::Data(vec![]);
 
     assert!(t.as_begin_array().is_none());
-}
-
-#[test]
-fn as_begin_array_err_begin_object() {
-    let t = Token::BeginObject(4711);
-    let err = t.as_begin_array_err().unwrap_err();
-
-    assert!(matches!(err, Error::UnexpectedEvent { expected, found }
-        if expected == "BeginArray" && found == "BeginObject"));
-}
-
-#[test]
-fn as_begin_array_err_end_object() {
-    let t = Token::EndObject;
-    let err = t.as_begin_array_err().unwrap_err();
-
-    assert!(matches!(err, Error::UnexpectedEvent { expected, found }
-        if expected == "BeginArray" && found == "EndObject"));
-}
-
-#[test]
-fn as_begin_array_err_begin_array() {
-    let t = Token::BeginArray(4711);
-
-    assert_eq!(t.as_begin_array_err().unwrap(), 4711);
-}
-
-#[test]
-fn as_begin_array_err_end_array() {
-    let t = Token::EndArray;
-    let err = t.as_begin_array_err().unwrap_err();
-
-    assert!(matches!(err, Error::UnexpectedEvent { expected, found }
-        if expected == "BeginArray" && found == "EndArray"));
-}
-
-#[test]
-fn as_begin_array_err_data() {
-    let t = Token::Data(vec![]);
-    let err = t.as_begin_array_err().unwrap_err();
-
-    assert!(matches!(err, Error::UnexpectedEvent { expected, found }
-        if expected == "BeginArray" && found == "Data"));
 }
 
 #[test]
