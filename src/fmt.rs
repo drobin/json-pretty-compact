@@ -24,10 +24,8 @@ use serde_json::ser::{CharEscape, CompactFormatter, Formatter};
 use std::io::{self, Cursor};
 
 use crate::error::Error;
+use crate::options::Options;
 use crate::token::Token;
-
-const DEFAULT_INDENT: u32 = 2;
-const DEFAULT_MAX_LEN: Option<u32> = Some(120);
 
 fn write_to_vec<F: FnOnce(&mut Cursor<Vec<u8>>) -> io::Result<()>>(f: F) -> io::Result<Vec<u8>> {
     let mut cursor = Cursor::new(vec![]);
@@ -98,8 +96,7 @@ macro_rules! write_func {
 /// let formatter = PrettyCompactFormatter::new().with_max_line_length(80);
 /// ```
 pub struct PrettyCompactFormatter {
-    indent: u32,
-    max_len: Option<u32>,
+    options: Options,
     token: Vec<Token>,
     level: u32,
 }
@@ -108,30 +105,29 @@ impl PrettyCompactFormatter {
     /// Creates a `PrettyCompactFormatter` with a set of default rules.
     pub fn new() -> PrettyCompactFormatter {
         Self {
-            max_len: DEFAULT_MAX_LEN,
-            ..Self::no_rules()
+            options: Options::default(),
+            token: vec![],
+            level: 0,
         }
     }
 
     /// Creates a `PrettyCompactFormatter` without any rules applied.
     pub fn no_rules() -> PrettyCompactFormatter {
         Self {
-            indent: DEFAULT_INDENT,
-            max_len: None,
-            token: vec![],
-            level: 0,
+            options: Options::no_rules(),
+            ..Self::new()
         }
     }
 
     /// Changes the indentation to the given value.
     pub fn with_indent(mut self, indent: u32) -> Self {
-        self.indent = indent;
+        self.options.set_indent(indent);
         self
     }
 
     /// Changes the maximum line length to the given value.
     pub fn with_max_line_length(mut self, len: u32) -> Self {
-        self.max_len = Some(len);
+        self.options.set_max_len(len);
         self
     }
 
@@ -143,7 +139,7 @@ impl PrettyCompactFormatter {
         }
 
         if self.token.len() == 1 {
-            self.token[0].format(writer, self.indent, self.max_len)?;
+            self.token[0].format(writer, &self.options)?;
         }
 
         Ok(())

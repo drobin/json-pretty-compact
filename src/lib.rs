@@ -128,6 +128,7 @@
 
 mod error;
 mod fmt;
+mod options;
 mod token;
 
 pub use crate::error::Error;

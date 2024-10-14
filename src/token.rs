@@ -26,6 +26,7 @@ mod tests;
 use std::io;
 
 use crate::error::Error;
+use crate::options::Options;
 
 macro_rules! write_indent {
     ($writer:expr, $len:ident) => {
@@ -125,18 +126,17 @@ impl Token {
     pub fn format<W: ?Sized + io::Write>(
         &self,
         writer: &mut W,
-        indent: u32,
-        max_len: Option<u32>,
+        options: &Options,
     ) -> io::Result<()> {
         match self {
             Token::BeginObject(_) | Token::EndObject | Token::BeginArray(_) | Token::EndArray => {}
             Token::Data(vec) => writer.write_all(vec)?,
             Token::Array(level, token) => {
-                let compact = self.can_compact(indent, max_len);
+                let compact = self.can_compact(options);
                 let mut first = true;
 
-                let spaces = (level * indent) as usize;
-                let spaces_next = ((level + 1) * indent) as usize;
+                let spaces = (level * options.indent()) as usize;
+                let spaces_next = ((level + 1) * options.indent()) as usize;
 
                 if compact {
                     writer.write_all(b"[ ")?;
@@ -157,7 +157,7 @@ impl Token {
                         write_indent!(writer, spaces_next);
                     }
 
-                    t.format(writer, indent, max_len)?;
+                    t.format(writer, options)?;
 
                     first = false;
                 }
@@ -173,11 +173,11 @@ impl Token {
                 }
             }
             Token::Object(level, token) => {
-                let compact = self.can_compact(indent, max_len);
+                let compact = self.can_compact(options);
                 let mut first = true;
 
-                let spaces = (level * indent) as usize;
-                let spaces_next = ((level + 1) * indent) as usize;
+                let spaces = (level * options.indent()) as usize;
+                let spaces_next = ((level + 1) * options.indent()) as usize;
 
                 if compact {
                     writer.write_all(b"{ ")?;
@@ -204,7 +204,7 @@ impl Token {
 
                     writer.write_all(key)?;
                     writer.write_all(b": ")?;
-                    t2.format(writer, indent, max_len)?;
+                    t2.format(writer, options)?;
 
                     first = false;
                 }
@@ -224,7 +224,7 @@ impl Token {
         Ok(())
     }
 
-    fn can_compact(&self, indent: u32, max_len: Option<u32>) -> bool {
+    fn can_compact(&self, options: &Options) -> bool {
         match self {
             Token::BeginObject(_)
             | Token::EndObject
@@ -232,15 +232,11 @@ impl Token {
             | Token::EndArray
             | Token::Data(_) => true,
             Token::Array(level, _) | Token::Object(level, _) => {
-                if let Some(ml) = max_len {
-                    let mut len = self.length();
+                options.max_len().is_some_and(|max| {
+                    let prefix = (level * options.indent()) as usize;
 
-                    len += (level * indent) as usize;
-
-                    len < ml as usize
-                } else {
-                    false
-                }
+                    prefix + self.length() < max as usize
+                })
             }
         }
     }
