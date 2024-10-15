@@ -139,7 +139,7 @@ impl PrettyCompactFormatter {
         }
 
         if self.token.len() == 1 {
-            self.token[0].format(writer, &self.options)?;
+            self.token[0].format(writer, &self.options, None)?;
         }
 
         Ok(())

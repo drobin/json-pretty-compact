@@ -23,6 +23,7 @@
 #[cfg(test)]
 mod tests;
 
+use std::fmt::{self, Display, Formatter};
 use std::io;
 
 use crate::error::Error;
@@ -101,23 +102,28 @@ impl Token {
             Token::BeginObject(_) | Token::EndObject | Token::BeginArray(_) | Token::EndArray => 0,
             Token::Data(vec) => vec.len(),
             Token::Array(_, token) => {
-                if token.is_empty() {
-                    3 // [ ]
-                } else {
-                    let n = token.iter().fold(0, |acc, t| acc + t.length());
+                let n = token.iter().fold(0, |acc, t| acc + t.length());
 
-                    // add all the commas and spaces
-                    4 + n + (token.len() - 1) * 2
+                // add all commas between elements
+                let inner = n + (token.len().checked_sub(1).unwrap_or(0) * 2);
+
+                if inner > 0 {
+                    4 + inner // plus surrounding [ ]
+                } else {
+                    3 // [ ]
                 }
             }
             Token::Object(_, token) => {
-                if token.is_empty() {
-                    3 // { }
-                } else {
-                    let n = token.iter().fold(0, |acc, t| acc + t.length());
+                let n = token.iter().fold(0, |acc, t| acc + t.length());
+                let num_keys = token.len() / 2;
 
-                    // add all the commas and spaces
-                    4 + n + (token.len() - 1) * 3
+                // add ": " between key & value and commas between elements
+                let inner = n + 2 * num_keys + (num_keys.checked_sub(1).unwrap_or(0) * 2);
+
+                if inner > 0 {
+                    4 + inner // plus surrounding {}
+                } else {
+                    3 // [ ] or { }
                 }
             }
         }
@@ -127,12 +133,13 @@ impl Token {
         &self,
         writer: &mut W,
         options: &Options,
+        forced_compact: Option<bool>,
     ) -> io::Result<()> {
         match self {
             Token::BeginObject(_) | Token::EndObject | Token::BeginArray(_) | Token::EndArray => {}
             Token::Data(vec) => writer.write_all(vec)?,
             Token::Array(level, token) => {
-                let compact = self.can_compact(options);
+                let compact = forced_compact.unwrap_or_else(|| self.can_compact(options, None));
                 let mut first = true;
 
                 let spaces = (level * options.indent()) as usize;
@@ -157,7 +164,7 @@ impl Token {
                         write_indent!(writer, spaces_next);
                     }
 
-                    t.format(writer, options)?;
+                    t.format(writer, options, None)?;
 
                     first = false;
                 }
@@ -173,16 +180,19 @@ impl Token {
                 }
             }
             Token::Object(level, token) => {
-                let compact = self.can_compact(options);
+                let compact = forced_compact.unwrap_or_else(|| self.can_compact(options, None));
                 let mut first = true;
 
                 let spaces = (level * options.indent()) as usize;
                 let spaces_next = ((level + 1) * options.indent()) as usize;
+                let mut cur_indent = 0;
 
                 if compact {
                     writer.write_all(b"{ ")?;
+                    cur_indent += 2;
                 } else {
                     writer.write_all(b"{\n")?;
+                    cur_indent = spaces;
                 }
 
                 let iter = token.chunks_exact(2).map(|chunk| (&chunk[0], &chunk[1]));
@@ -193,18 +203,31 @@ impl Token {
                     if !first {
                         if compact {
                             writer.write_all(b", ")?;
+                            cur_indent += 2;
                         } else {
                             writer.write_all(b",\n")?;
+                            cur_indent = 0;
                         }
                     }
 
                     if !compact {
                         write_indent!(writer, spaces_next);
+                        cur_indent += spaces_next;
                     }
 
                     writer.write_all(key)?;
                     writer.write_all(b": ")?;
-                    t2.format(writer, options)?;
+                    cur_indent += key.len() + 2;
+
+                    // Let's check if the value can be put compacted behind the key in one line.
+                    let forced_compact = t2.can_compact(options, Some(cur_indent));
+
+                    if !forced_compact {
+                        // There is not enough space to put the value into the same line.
+                        t2.format(writer, options, Some(false))?;
+                    } else {
+                        t2.format(writer, options, None)?;
+                    }
 
                     first = false;
                 }
@@ -224,7 +247,7 @@ impl Token {
         Ok(())
     }
 
-    fn can_compact(&self, options: &Options) -> bool {
+    fn can_compact(&self, options: &Options, forced_indent: Option<usize>) -> bool {
         match self {
             Token::BeginObject(_)
             | Token::EndObject
@@ -233,7 +256,8 @@ impl Token {
             | Token::Data(_) => true,
             Token::Array(level, _) | Token::Object(level, _) => {
                 options.max_len().is_some_and(|max| {
-                    let prefix = (level * options.indent()) as usize;
+                    let prefix =
+                        forced_indent.unwrap_or_else(|| (level * options.indent()) as usize);
 
                     prefix + self.length() < max as usize
                 })
@@ -250,6 +274,33 @@ impl Token {
             Self::Data(_) => "Data",
             Self::Array(_, _) => "Array",
             Self::Object(_, _) => "Object",
+        }
+    }
+}
+
+impl Display for Token {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        match self {
+            Token::BeginObject(_) => Ok(()),
+            Token::EndObject => Ok(()),
+            Token::BeginArray(_) => Ok(()),
+            Token::EndArray => Ok(()),
+            Token::Data(vec) => {
+                write!(fmt, "{}", String::from_utf8_lossy(vec))
+            }
+            Token::Array(_, token) => {
+                let vec = token.iter().map(|t| t.to_string()).collect::<Vec<_>>();
+
+                write!(fmt, "[ {} ]", vec.join(", "))
+            }
+            Token::Object(_, token) => {
+                let vec = token
+                    .chunks_exact(2)
+                    .map(|c| format!("{}: {}", c[0].to_string(), c[1].to_string()))
+                    .collect::<Vec<_>>();
+
+                write!(fmt, "{{ {} }}", vec.join(", "))
+            }
         }
     }
 }
