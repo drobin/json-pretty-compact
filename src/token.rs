@@ -105,7 +105,7 @@ impl Token {
                 let n = token.iter().fold(0, |acc, t| acc + t.length());
 
                 // add all commas between elements
-                let inner = n + (token.len().checked_sub(1).unwrap_or(0) * 2);
+                let inner = n + (token.len().saturating_sub(1) * 2);
 
                 if inner > 0 {
                     4 + inner // plus surrounding [ ]
@@ -118,7 +118,7 @@ impl Token {
                 let num_keys = token.len() / 2;
 
                 // add ": " between key & value and commas between elements
-                let inner = n + 2 * num_keys + (num_keys.checked_sub(1).unwrap_or(0) * 2);
+                let inner = n + 2 * num_keys + (num_keys.saturating_sub(1) * 2);
 
                 if inner > 0 {
                     4 + inner // plus surrounding {}
@@ -296,7 +296,7 @@ impl Display for Token {
             Token::Object(_, token) => {
                 let vec = token
                     .chunks_exact(2)
-                    .map(|c| format!("{}: {}", c[0].to_string(), c[1].to_string()))
+                    .map(|c| format!("{}: {}", c[0], c[1]))
                     .collect::<Vec<_>>();
 
                 write!(fmt, "{{ {} }}", vec.join(", "))
