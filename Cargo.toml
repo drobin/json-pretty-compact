@@ -22,7 +22,7 @@
 
 [package]
 name = "json-pretty-compact"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2018"
 authors = ["Robin Doer"]
 description = "A compact & pretty formatter for serde_json"
